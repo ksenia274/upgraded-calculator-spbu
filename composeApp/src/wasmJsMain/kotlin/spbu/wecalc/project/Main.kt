@@ -4,6 +4,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.ComposeViewport
 import kotlinx.browser.document
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -17,6 +20,8 @@ import androidx.compose.foundation.border
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusTarget
 import androidx.compose.ui.input.key.*
+import androidx.compose.ui.text.TextStyle
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
@@ -31,11 +36,37 @@ fun CalculatorScreen() {
 
     val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
 
+    val scrollState = rememberScrollState()
+
+    var error by remember { mutableStateOf<String?>(null) }
+
+    fun showError(msg: String) { error = msg }
+
     fun appendToken(token: String) {
         val ops = setOf("+", "-", "*", "/")
 
+        if (token == ".") {
+            val t = display.trimEnd()
+            if (t.isEmpty() || !t.last().isDigit()) {
+                showError("Точку можно ставить только после числа")
+                return
+            }
+            var i = t.length - 1
+            while (i >= 0 && (t[i].isDigit() || t[i] == '.')) i--
+            val currentNumber = t.substring(i + 1)
+            if (currentNumber.contains('.')) {
+                showError("В одном числе может быть только 1 точка")
+                return
+            }
+            display = t + "."
+            return
+        }
+
         if (token in ops) {
-            if (display == "0") return
+            if (display == "0") {
+                if (token == "-") display = "-"
+                return
+            }
 
             val d = display.trimEnd()
             display = if (d.isNotEmpty() && d.last() in charArrayOf('+','-','*','/')) {
@@ -57,10 +88,9 @@ fun CalculatorScreen() {
     fun backspace() {
         var d = display
         if (d == "0") return
-        while (d.isNotEmpty() && d.last().isWhitespace()) d = d.dropLast(1)
-        if (d.isNotEmpty()) d = d.dropLast(1)
-        while (d.isNotEmpty() && d.last().isWhitespace()) d = d.dropLast(1)
-        display = if (d.isEmpty()) "0" else d
+        d = d.trimEnd()
+        d = if (d.isNotEmpty()) d.dropLast(1).trimEnd() else d
+        display = d.ifEmpty { "0" }
     }
 
     Column(
@@ -115,22 +145,61 @@ fun CalculatorScreen() {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
+                .height(40.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            if (error != null) {
+                Surface(
+                    color = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError,
+                    shape = MaterialTheme.shapes.small
+                ) {
+                    Text(
+                        text = error!!,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        fontSize = 14.sp
+                    )
+                }
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
                 .height(300.dp)
                 .background(Color.Black, shape = MaterialTheme.shapes.medium)
                 .border(2.dp, Color.White, MaterialTheme.shapes.medium)
-                .padding(16.dp),
-            contentAlignment = Alignment.CenterEnd
+                .padding(end = 8.dp)
         ) {
-            Text(
-                text = display,
-                fontSize = 80.sp,
-                color = Color.White
-            )
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp)
+                    .verticalScroll(scrollState),
+                verticalArrangement = Arrangement.Bottom
+            ) {
+                Text(
+                    text = display,
+                    color = Color.White,
+                    softWrap = true,
+                    maxLines = Int.MAX_VALUE,
+                    style = TextStyle(
+                        fontSize = 64.sp,
+                        lineHeight = 72.sp,
+                        textAlign = TextAlign.End
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+
+        LaunchedEffect(display) {
+            scrollState.animateScrollTo(scrollState.maxValue)
         }
 
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End
+            horizontalArrangement = Arrangement.Center
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 val buttons = listOf(
@@ -155,6 +224,13 @@ fun CalculatorScreen() {
                     }
                 }
             }
+        }
+    }
+
+    LaunchedEffect(error) {
+        if (error != null) {
+            delay(3000)
+            error = null
         }
     }
 
