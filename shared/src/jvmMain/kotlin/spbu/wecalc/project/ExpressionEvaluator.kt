@@ -19,8 +19,8 @@ class ExpressionEvaluator : Calculator {
             CalcResult.Failure(CalcError.DivisionByZero)
         } catch (_: IllegalArgumentException) {
             CalcResult.Failure(CalcError.SyntaxError)
-        } catch (_: Exception) {
-            CalcResult.Failure(CalcError.InternalError("Unknown internal error"))
+        } catch (e: Exception) {
+            CalcResult.Failure(CalcError.InternalError(e.message ?: "Unknown internal error"))
         }
     }
 }
