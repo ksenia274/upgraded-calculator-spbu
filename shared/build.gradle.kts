@@ -1,5 +1,4 @@
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
-import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -17,6 +16,9 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             // put your Multiplatform dependencies here
+        }
+        jvmMain.dependencies {
+            implementation("net.objecthunter:exp4j:0.4.8")
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
