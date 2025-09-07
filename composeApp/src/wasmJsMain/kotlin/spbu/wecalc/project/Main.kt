@@ -104,7 +104,7 @@ fun CalculatorScreen() {
         modifier = Modifier
             .fillMaxWidth()
             .wrapContentHeight()
-            .padding(top = 200.dp, start = 16.dp, end = 16.dp)
+            .padding(start = 16.dp, end = 16.dp)
             .focusRequester(focusRequester)
             .focusTarget()
             .onPreviewKeyEvent { e ->
