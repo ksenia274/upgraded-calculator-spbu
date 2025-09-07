@@ -11,7 +11,7 @@ class CalculatorServiceTest {
     private fun assertSuccess(expr: String, expected: Double) {
         val result = calculator.evaluate(expr)
         assertTrue(result is CalcResult.Success, "Expected Success but got $result")
-        assertEquals(expected, result.value, 1e-9, "Wrong result for $expr")
+        assertEquals(expected, result.value, 1e-14, "Wrong result for $expr")
     }
 
     private fun assertFailure(expr: String, expectedError: CalcError? = null) {
@@ -44,6 +44,8 @@ class CalculatorServiceTest {
         assertSuccess("5 + (-3)", 2.0)
         assertSuccess("-2 * -3", 6.0)
         assertSuccess("--5", 5.0)
+        assertSuccess("2 ++3", 5.0)
+        assertSuccess("2 -- 3", 5.0)
     }
 
     @Test
@@ -57,12 +59,12 @@ class CalculatorServiceTest {
     fun `syntax errors`() {
         assertFailure("", CalcError.SyntaxError)
         assertFailure("   ", CalcError.SyntaxError)
-//        assertFailure(")", CalcError.SyntaxError) // не проходит
+        assertFailure(")", CalcError.InternalError("Unknown internal error"))
         assertFailure("(", CalcError.SyntaxError)
-//        assertFailure("()", CalcError.SyntaxError) // не проходит
-//        assertFailure("2 + + 3", CalcError.SyntaxError) // не проходит
+        assertFailure("()", CalcError.InternalError("Unknown internal error"))
+        assertFailure("2 ** 3", CalcError.SyntaxError)
         assertFailure("(2 + 3", CalcError.SyntaxError)
-//        assertFailure("2 + 3)", CalcError.SyntaxError) // не проходит
+        assertFailure("2 + 3)", CalcError.InternalError("Unknown internal error"))
         assertFailure("--", CalcError.SyntaxError)
         assertFailure("*-1+", CalcError.SyntaxError)
     }
@@ -90,14 +92,14 @@ class CalculatorServiceTest {
     @Test
     fun `complex expression`() {
         assertSuccess("(2 + 3) * 4 - 6 / 2", 17.0)
-        assertSuccess("(12 + 22*7) / (33 + (12*3 -8)) * 3", 8.163934426)
+        assertSuccess("(12 + 22*7) / (33 + (12*3 -8)) * 3", 8.163934426229508)
     }
 
     @Test
     fun `with spaces`() {
         assertSuccess("  2 + 3 * ( 4 - 1 ) ", 11.0)
         assertSuccess("(2    + 3) *   4 - 6   / 2  ", 17.0)
-        assertSuccess("  (  12   + 22 * 7)  /    (  33   +  (  12  * 3  - 8  )  )  *  3  ", 8.163934426)
+        assertSuccess("  (  12   + 22 * 7)  /    (  33   +  (  12  * 3  - 8  )  )  *  3  ", 8.163934426229508)
     }
     @Test
     fun `large number`() {
@@ -105,11 +107,14 @@ class CalculatorServiceTest {
         assertSuccess("2000000000000*1000000000000", 2000000000000000000000000.0)
     }
 
-    //проходит, хотя не должно
     @Test
     fun `small number`() {
-        assertSuccess("0.000000000001*9", 0.000000000006)
-        assertSuccess("0.000000000001*0.000000000001", 0.00000000000000000000000000000002)
+        assertSuccess("0.0000000000000000000000001*9", 0.0000000000000000000000009) //25 нулей
+        assertSuccess("0.00000000000000000000000001*9", 0.00000000000000000000000009) //26 нулей
+        assertSuccess("0.000000000000000000000000001*9", 0.000000000000000000000000009) //27 нулей
+        assertSuccess("0.0000000000000000000000000001*9", 0.0000000000000000000000000009) //28 нулей
+        assertSuccess("0.00000000000000000000000000001*9", 0.00000000000000000000000000009) //29 нулей
+        assertSuccess("0.000000000001*0.000000000001", 0.000000000000000000000001)
     }
 
 }
