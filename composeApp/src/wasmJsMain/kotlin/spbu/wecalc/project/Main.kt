@@ -1,5 +1,8 @@
 package spbu.wecalc.project
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.ComposeViewport
@@ -22,6 +25,9 @@ import androidx.compose.ui.focus.focusTarget
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.text.TextStyle
 import kotlinx.coroutines.delay
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
 
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
@@ -201,7 +207,60 @@ fun CalculatorScreen() {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            val buttonHeight = 72.dp
+            val verticalGap = 10.dp
+
+            var showHistory by remember { mutableStateOf(false) }
+
+            Column(modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(verticalGap)) {
+                Button(
+                    onClick = {
+                        showHistory = !showHistory
+                        //TODO: запрос истории из БД
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color.Black,
+                        contentColor = Color.White
+                    ),
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(buttonHeight)
+                        .border(2.dp, Color.White, MaterialTheme.shapes.medium)
+                ) {
+                    Text("История вычислений", fontSize = 24.sp)
+                }
+
+                AnimatedVisibility(
+                    visible = showHistory,
+                    enter = expandVertically(animationSpec = tween(220)) + fadeIn(tween(150)),
+                    exit = shrinkVertically(animationSpec = tween(220)) + fadeOut(tween(150))
+                ) {
+                    val historyHeight = buttonHeight * 4 + verticalGap * 3
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(historyHeight)
+                            .background(Color.Black, shape = MaterialTheme.shapes.medium)
+                            .border(2.dp, Color.White, MaterialTheme.shapes.medium)
+                            .padding(12.dp)
+                    ) {
+                        //TODO:вывести историю вычислений через БД
+                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                            Text(
+                                text = "Здесь будет история вычислений",
+                                color = Color.White,
+                                fontSize = 18.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.width(16.dp))
+
+            Column(verticalArrangement = Arrangement.spacedBy(verticalGap)) {
                 val buttons = listOf(
                     listOf("(", ")", "DEL", "C"),
                     listOf("7", "8", "9", "/"),
@@ -210,7 +269,7 @@ fun CalculatorScreen() {
                     listOf("0", ".", "=", "+")
                 )
                 buttons.forEach { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         row.forEach { label ->
                             CalculatorButton(label) {
                                 when (label) {
