@@ -28,7 +28,13 @@ import kotlinx.coroutines.delay
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.fadeIn
+import kotlinx.coroutines.launch
+import spbu.wecalc.project.history.HistoryItemResponse
+import kotlinx.datetime.*
 
+// Глобальные экземпляры для API
+private val apiService = ApiService()
+private val remoteCalculator = RemoteCalculator(apiService)
 
 @OptIn(ExperimentalComposeUiApi::class)
 fun main() {
@@ -42,12 +48,39 @@ fun CalculatorScreen() {
     var display by remember { mutableStateOf("0") }
 
     val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
-
     val scrollState = rememberScrollState()
 
     var error by remember { mutableStateOf<String?>(null) }
+    var isCalculating by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
 
     fun showError(msg: String) { error = msg }
+
+    suspend fun performCalculation() {
+        val expression = display.trim()
+        if (expression.isEmpty()) return
+        
+        isCalculating = true
+        try {
+            val result = remoteCalculator.evaluate(expression)
+            when (result) {
+                is CalcResult.Success -> {
+                    display = result.value.toString()
+                }
+                is CalcResult.Failure -> {
+                    when (val error = result.error) {
+                        is CalcError.DivisionByZero -> showError("Деление на ноль")
+                        is CalcError.SyntaxError -> showError("Ошибка синтаксиса")
+                        is CalcError.InternalError -> showError("Ошибка: ${error.message}")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            showError("Ошибка соединения с сервером: ${e.message}")
+        } finally {
+            isCalculating = false
+        }
+    }
 
     fun appendToken(token: String) {
         val ops = setOf("+", "-", "*", "/")
@@ -140,7 +173,7 @@ fun CalculatorScreen() {
                     Key.Backspace -> { backspace(); true }
                     Key.Delete -> { display = "0"; true }
                     Key.Enter, Key.NumPadEnter -> {
-                        //TODO: вызов сервиса(=)
+                        coroutineScope.launch { performCalculation() }
                         true
                     }
                     else -> false
@@ -186,13 +219,13 @@ fun CalculatorScreen() {
                 verticalArrangement = Arrangement.Bottom
             ) {
                 Text(
-                    text = display,
-                    color = Color.White,
+                    text = if (isCalculating) "Вычисляю..." else display,
+                    color = if (isCalculating) Color.Yellow else Color.White,
                     softWrap = true,
                     maxLines = Int.MAX_VALUE,
                     style = TextStyle(
-                        fontSize = 64.sp,
-                        lineHeight = 72.sp,
+                        fontSize = if (isCalculating) 32.sp else 64.sp,
+                        lineHeight = if (isCalculating) 40.sp else 72.sp,
                         textAlign = TextAlign.End
                     ),
                     modifier = Modifier.fillMaxWidth()
@@ -212,13 +245,36 @@ fun CalculatorScreen() {
             val verticalGap = 10.dp
 
             var showHistory by remember { mutableStateOf(false) }
+            var historyItems by remember { mutableStateOf<List<HistoryItemResponse>>(emptyList()) }
+            var isLoadingHistory by remember { mutableStateOf(false) }
+
+            suspend fun loadHistory() {
+                isLoadingHistory = true
+                try {
+                    val result = apiService.getHistory(20)
+                    result.fold(
+                        onSuccess = { response ->
+                            historyItems = response.items
+                        },
+                        onFailure = { exception ->
+                            showError("Ошибка загрузки истории: ${exception.message}")
+                        }
+                    )
+                } catch (e: Exception) {
+                    showError("Ошибка соединения при загрузке истории")
+                } finally {
+                    isLoadingHistory = false
+                }
+            }
 
             Column(modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(verticalGap)) {
                 Button(
                     onClick = {
                         showHistory = !showHistory
-                        //TODO: запрос истории из БД
+                        if (showHistory && historyItems.isEmpty()) {
+                            coroutineScope.launch { loadHistory() }
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color.Black,
@@ -247,13 +303,44 @@ fun CalculatorScreen() {
                             .border(2.dp, Color.White, MaterialTheme.shapes.medium)
                             .padding(12.dp)
                     ) {
-                        //TODO:вывести историю вычислений через БД
                         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                            Text(
-                                text = "Здесь будет история вычислений",
-                                color = Color.White,
-                                fontSize = 18.sp
-                            )
+                            if (isLoadingHistory) {
+                                Text(
+                                    text = "Загрузка истории...",
+                                    color = Color.White,
+                                    fontSize = 18.sp,
+                                    modifier = Modifier.padding(8.dp)
+                                )
+                            } else if (historyItems.isEmpty()) {
+                                Text(
+                                    text = "История вычислений пуста",
+                                    color = Color.White,
+                                    fontSize = 18.sp,
+                                    modifier = Modifier.padding(8.dp)
+                                )
+                            } else {
+                                historyItems.forEach { item ->
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp, horizontal = 8.dp)
+                                    ) {
+                                        Text(
+                                            text = "${item.expression} = ${item.result}",
+                                            color = Color.White,
+                                            fontSize = 16.sp
+                                        )
+                                        val instant = Instant.fromEpochMilliseconds(item.timestampMs)
+                                        val dateTime = instant.toLocalDateTime(TimeZone.currentSystemDefault())
+                                        Text(
+                                            text = "${dateTime.date} ${dateTime.time}",
+                                            color = Color.Gray,
+                                            fontSize = 12.sp
+                                        )
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -276,7 +363,9 @@ fun CalculatorScreen() {
                                 when (label) {
                                     "C" -> display = "0"
                                     "DEL" -> backspace()
-                                    "=" -> { /* TODO: отправка на сервер */ }
+                                    "=" -> {
+                                        coroutineScope.launch { performCalculation() }
+                                    }
                                     else -> appendToken(label)
                                 }
                             }
