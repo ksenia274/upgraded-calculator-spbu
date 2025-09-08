@@ -14,17 +14,6 @@ import io.ktor.server.routing.route
 import io.ktor.server.routing.routing
 
 fun Application.historyModule() {
-
-    // CORS (dev)
-    install(CORS) {
-        anyHost() // в проде ограничь доменами
-        allowHeader(HttpHeaders.ContentType)
-        allowHeader("X-User-Id")
-        allowMethod(HttpMethod.Get)
-        allowMethod(HttpMethod.Post)
-        allowMethod(HttpMethod.Delete)
-    }
-
     val repo = ServerHistoryRepository()
 
     routing {
