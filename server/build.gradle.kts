@@ -18,6 +18,13 @@ dependencies {
     implementation(libs.logback)
     implementation(libs.ktor.serverCore)
     implementation(libs.ktor.serverNetty)
+    // ➕ JSON для Ktor
+    implementation(libs.ktor.serverContentNegotiation)
+    implementation(libs.ktor.serializationKotlinxJson)
+
+    // ➕ kotlinx.serialization JSON (для ручного encode/decode в репозитории)
+    implementation(libs.serializationJson)
     testImplementation(libs.ktor.serverTestHost)
     testImplementation(libs.kotlin.testJunit)
+    implementation(libs.ktor.serverCors)
 }
