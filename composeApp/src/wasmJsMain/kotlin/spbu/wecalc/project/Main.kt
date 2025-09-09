@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.ComposeViewport
+import androidx.compose.foundation.clickable
 import kotlinx.browser.document
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -54,7 +55,30 @@ fun CalculatorScreen() {
     var isCalculating by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
+    var showHistory by remember { mutableStateOf(false) }
+    var historyItems by remember { mutableStateOf<List<HistoryItemResponse>>(emptyList()) }
+    var isLoadingHistory by remember { mutableStateOf(false) }
+
     fun showError(msg: String) { error = msg }
+
+    suspend fun loadHistory() {
+        isLoadingHistory = true
+        try {
+            val result = apiService.getHistory(20)
+            result.fold(
+                onSuccess = { response ->
+                    historyItems = response.items
+                },
+                onFailure = { exception ->
+                    showError("Ошибка загрузки истории: ${exception.message}")
+                }
+            )
+        } catch (e: Exception) {
+            showError("Ошибка соединения при загрузке истории")
+        } finally {
+            isLoadingHistory = false
+        }
+    }
 
     suspend fun performCalculation() {
         val expression = display.trim()
@@ -79,6 +103,7 @@ fun CalculatorScreen() {
             showError("Ошибка соединения с сервером: ${e.message}")
         } finally {
             isCalculating = false
+            loadHistory()
         }
     }
 
@@ -244,29 +269,6 @@ fun CalculatorScreen() {
             val buttonHeight = 72.dp
             val verticalGap = 10.dp
 
-            var showHistory by remember { mutableStateOf(false) }
-            var historyItems by remember { mutableStateOf<List<HistoryItemResponse>>(emptyList()) }
-            var isLoadingHistory by remember { mutableStateOf(false) }
-
-            suspend fun loadHistory() {
-                isLoadingHistory = true
-                try {
-                    val result = apiService.getHistory(20)
-                    result.fold(
-                        onSuccess = { response ->
-                            historyItems = response.items
-                        },
-                        onFailure = { exception ->
-                            showError("Ошибка загрузки истории: ${exception.message}")
-                        }
-                    )
-                } catch (e: Exception) {
-                    showError("Ошибка соединения при загрузке истории")
-                } finally {
-                    isLoadingHistory = false
-                }
-            }
-
             Column(modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(verticalGap)) {
                 Button(
@@ -324,6 +326,11 @@ fun CalculatorScreen() {
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(vertical = 4.dp, horizontal = 8.dp)
+                                            .clickable {
+                                                val expression = item.expression.substringBefore('=').trim()
+                                                display = if (expression.isNotEmpty()) expression else item.expression.trim()
+                                                focusRequester.requestFocus()
+                                            }
                                     ) {
                                         Text(
                                             text = "${item.expression} = ${item.result}",
